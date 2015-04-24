@@ -9,7 +9,7 @@ num_rows: 	.space 4
 num_columns: 	.space 4
 solution: 	.space 804
 energy_flag:	.space 4
-filed_count:	.space 4
+field_count:	.space 4
 test_str:	.asciiz "PRINT solution\n"
 horiz_strncmp_str: .asciiz "In horiz_strncmp\n"
 #puzzle: 	.space 4
@@ -78,6 +78,12 @@ main:
 restart:
 	# lw 	$t1, GET_ENERGY
  # 	sw 	$t1, PRINT_INT
+ 	# lw 	$t1, GET_ENERGY
+ 	# bge 	$t1, 40, done_loop
+
+
+
+
 	li	$t2, 0    			# counter
 	la	$t1, scan_data			# load scan data
 	li      $t5, 0 				# load 0 for flag for scanning
@@ -191,10 +197,166 @@ done_moving:
 	sw	$t0, VELOCITY		# drive
 	li      $t5, 3
 	sw      $t5, FIELD_STRENGTH	
+
+# energy_check:
+ 
+# la	$t0, planet_data
+# 	sw	$t0, PLANETS_REQUEST
+# 	la 	$t0, planet_data	#load address of planet_request into $t0
+# 	lw	$t3, 0($t0)		#loads the planet X coord
+# 	lw	$t4, 4($t0)		#loads the planet Y coord
+# 	lw	$t1, BOT_X
+# 	lw	$t2, BOT_Y
+# 	sub     $t5, $t3, $t1
+# 	mul	$t5, $t5, $t5	# x^2
+# 	sub     $t6, $t4, $t2
+# 	mul	$t6, $t6, $t6	# y^2
+# 	add	$v0, $t6, $t5	# x^2 + y^2
+# 	mtc1	$v0, $f0
+# 	cvt.s.w	$f0, $f0		# float(x^2 + y^2)
+# 	sqrt.s	$f0, $f0		# sqrt(x^2 + y^2)
+# 	cvt.w.s	$f0, $f0		# int(sqrt(...))
+# 	mfc1	$v0, $f0	
+# 	move 	$t0, $v0
+# 	la 	$t1, puzzle
+# 	sw	$t1, SPIMBOT_PUZZLE_REQUEST
+# 	la 	$t1, puzzle
+# 	lw 	$t2, 0($t1)		#contains num_rows
+# 	la 	$t5, num_rows
+# 	sw 	$t2, 0($t5)		#store num_rows
+# 	lw	$t2, 4($t1)		#contains num_columns
+# 	la 	$t5, num_columns
+# 	sw 	$t2, 0($t5)		#store num_columns
+
+# 	la 	$t1, lexicon
+# 	sw 	$t1, SPIMBOT_LEXICON_REQUEST
+# 	lw 	$a1, 0($t1)		#load word into a1 the lexicon_size
+# 	add 	$t1, $t1, 4
+# 	move	$a0, $t1		#load the char ** dictionary)
+# 	jal 	find_words
+# #	lw 	$t1, GET_ENERGY
+# #	sw 	$t1, PRINT_INT
+# solver:
+# 	la 	$t1, solution
+# 	sw 	$t1, SPIMBOT_SOLVE_REQUEST
+# #	lw 	$t1, GET_ENERGY
+#  #	sw 	$t1, PRINT_INT
+# #	lw 	$t1, solution_count
+# #	sw 	$t1, PRINT_INT
+# 	move 	$t2, $zero
+# # print_loop:
+# # 	bge	$t2, $t1, done_loop
+# # 	li	$v0, PRINT_STRING			# Unhandled interrupt types
+# # 	la	$a0, test_str
+# # 	la 	$t3, solution_arr
+# # 	mul	$t4, $t2, 8
+# # 	add 	$t4, $t4, $t3
+# # 	lw 	$t1, 0($t4)
+# # 	sw 	$t1, PRINT_INT
+# # 	lw 	$t1, 4($t4)
+# # 	sw 	$t1, PRINT_INT
+# # 	add 	$t2, $t2, 1
+# # 	j 	print_loop
+# done_loop:
+# 	la 	$t1, solution 		#reste solution here
+# 	sw 	$zero, 0($t1) 
+
+
+# no_energy_interrupt:
+	
+# 	done_can_field_strength:
+# 	li 	$t0, 2
+# 	sw 	$t0, FIELD_STRENGTH
+#I'm going to implememtn a check to see if I'm too close to the planenet to start with, then I'll wait it to come back the next time
+
+move_towards_orbital:
+	
+	la	$t0, planet_data	#load the address of planet data
+	sw	$t0, PLANETS_REQUEST	#store the address of the stack memory in to planet_request
+	lw	$t7, 8($t0)		#loads the planet's orbital radius
+	#lw	$t3, 0($t0)		#holds x coordinate of the my planet
+	#lw	$t4, 4($t0)		#hollds y coordinate of my planet
+	li	$t3, 150 		#load x and y coord with that of the sun (center)
+	li 	$t4, 150
+	lw	$t1, BOT_X
+	lw	$t2, BOT_Y
+	sub     $t5, $t3, $t1
+	mul	$t5, $t5, $t5	# x^2
+	sub     $t6, $t4, $t2
+	mul	$t6, $t6, $t6	# y^2
+	add	$v0, $t6, $t5	# x^2 + y^2
+	mtc1	$v0, $f0
+	cvt.s.w	$f0, $f0	# float(x^2 + y^2)
+	sqrt.s	$f0, $f0	# sqrt(x^2 + y^2)
+	cvt.w.s	$f0, $f0	# int(sqrt(...))
+	mfc1	$v0, $f0	
+	move 	$t0, $v0
+#t0 now contains the eucledian distance
+#if the distance != orbital radius, I am going to move towards the orbital radius point. 
+	
+	ble 	$t0, $t7, stop_moving_wait
+#now to check if the distance is greater than or less than the orbital radius
+	li 	$t5, 4
+	sw 	$t5, VELOCITY
+	#blt 	$t0, $t7, less_than	#the bot is less than the orbital radius away 
+	bgt 	$t0, $t7, greater_than 	#the bot is further than the orbiatl radius away 
+	j 	move_towards_orbital	#just in case.. Should never hit this statement. Logical Check.
+greater_than:
+	bgt 	$t1, $t3, right_1	#check if bot_x > 150
+	bgt 	$t2, $t4, left_down_1
+	li	$t5, 45			#set angle to 0
+	sw	$t5, ANGLE		
+	li      $t6, 1			#set to absolute
+	sw	$t6, ANGLE_CONTROL
+	j 	move_towards_orbital
+left_down_1:
+	li	$t5, 315		#set angle to 0
+	sw	$t5, ANGLE		
+	li      $t6, 1			#set to absolute
+	sw	$t6, ANGLE_CONTROL
+	j 	move_towards_orbital
+right_1:	
+	bgt 	$t2, $t4, right_down_1
+	li	$t5, 135		#set angle to 0
+	sw	$t5, ANGLE		
+	li      $t6, 1			#set to absolute
+	sw	$t6, ANGLE_CONTROL
+	j 	move_towards_orbital
+right_down_1:
+	li	$t5, 225		#set angle to 0
+	sw	$t5, ANGLE		
+	li      $t6, 1			#set to absolute
+	sw	$t6, ANGLE_CONTROL
+	j 	move_towards_orbital
+
+stop_moving_wait:
+#wait till the red planet is on me.
+
+	li 	$t0, 2
+	sw 	$t0, FIELD_STRENGTH
+	sw 	$zero, VELOCITY #stop the bot and wait for the red planet
 energy_check:
-	la 	$t1, energy_flag
-	lw 	$t1, 0($t1)
-	beq	$t1, $zero, no_energy_interrupt
+ 
+	la	$t0, planet_data
+	sw	$t0, PLANETS_REQUEST
+	la 	$t0, planet_data	#load address of planet_request into $t0
+	lw	$t3, 0($t0)		#loads the planet X coord
+	lw	$t4, 4($t0)		#loads the planet Y coord
+	lw	$t1, BOT_X
+	lw	$t2, BOT_Y
+	sub     $t5, $t3, $t1
+	mul	$t5, $t5, $t5	# x^2
+	sub     $t6, $t4, $t2
+	mul	$t6, $t6, $t6	# y^2
+	add	$v0, $t6, $t5	# x^2 + y^2
+	mtc1	$v0, $f0
+	cvt.s.w	$f0, $f0		# float(x^2 + y^2)
+	sqrt.s	$f0, $f0		# sqrt(x^2 + y^2)
+	cvt.w.s	$f0, $f0		# int(sqrt(...))
+	mfc1	$v0, $f0	
+	move 	$t0, $v0
+	blt	$t0, 90, no_energy_interrupt
+
 	la 	$t1, puzzle
 	sw	$t1, SPIMBOT_PUZZLE_REQUEST
 	la 	$t1, puzzle
@@ -213,13 +375,14 @@ energy_check:
 	jal 	find_words
 #	lw 	$t1, GET_ENERGY
 #	sw 	$t1, PRINT_INT
+solver:
 	la 	$t1, solution
 	sw 	$t1, SPIMBOT_SOLVE_REQUEST
 #	lw 	$t1, GET_ENERGY
  #	sw 	$t1, PRINT_INT
 #	lw 	$t1, solution_count
 #	sw 	$t1, PRINT_INT
-	move 	$t2, $zero
+#	move 	$t2, $zero
 # print_loop:
 # 	bge	$t2, $t1, done_loop
 # 	li	$v0, PRINT_STRING			# Unhandled interrupt types
@@ -234,15 +397,72 @@ energy_check:
 # 	add 	$t2, $t2, 1
 # 	j 	print_loop
 done_loop:
-	la 	$t1, solution
-	sw 	$zero, 0($t1)
-	la 	$t1, energy_flag
-	sw	$zero, 0($t1)
-	# SET ENERGY COUNT TO BE 0
+	la 	$t1, solution 		#reste solution here
+	sw 	$zero, 0($t1) 
+
+
 no_energy_interrupt:
 	
-	j 	restart
+	done_can_field_strength:
+	li 	$t0, 2
+	sw 	$t0, FIELD_STRENGTH
 
+
+	# li 	$t0, 2
+	# sw 	$t0, FIELD_STRENGTH
+	# sw 	$zero, VELOCITY #stop the bot and wait for the red planet
+	la	$t0, planet_data
+	sw	$t0, PLANETS_REQUEST
+	la 	$t0, planet_data	#load address of planet_request into $t0
+	lw	$t3, 0($t0)		#loads the planet X coord
+	lw	$t4, 4($t0)		#loads the planet Y coord
+	lw 	$t7, 12($t0) 		#hill sphere radius. If the diff is the hill sphere radius, then I will relase.
+check_if_planet_bot_align:
+	la	$t0, planet_data
+	sw	$t0, PLANETS_REQUEST
+	la 	$t0, planet_data	#load address of planet_request into $t0
+	lw	$t3, 0($t0)		#loads the planet X coord
+	lw	$t4, 4($t0)		#loads the planet Y coord
+	lw	$t1, BOT_X
+	lw	$t2, BOT_Y
+	sub     $t5, $t3, $t1
+	mul	$t5, $t5, $t5	# x^2
+	sub     $t6, $t4, $t2
+	mul	$t6, $t6, $t6	# y^2
+	add	$v0, $t6, $t5	# x^2 + y^2
+
+	ble 	$v0, $t7, planet_reached
+	j 	check_if_planet_bot_align
+
+planet_reached:
+	
+
+# loop_start:
+# 	la 	$t2, field_count
+# 	sw 	$t2, SPIMBOT_GET_FIELD_CNT
+# 	lw 	$t2, 0($t2)
+# 	beq	$t2, $zero, done_waiting
+# 	j 	loop_start
+done_waiting:
+	li 	$t0, 0
+	sw 	$t0, FIELD_STRENGTH	#release them
+	la	$t0, planet_data
+	sw	$t0, PLANETS_REQUEST
+	la 	$t0, planet_data	#load address of planet_request into $t0
+	lw	$t3, 0($t0)		#loads the planet X coord
+	lw	$t4, 4($t0)		#loads the planet Y coord
+	lw	$t1, BOT_X
+	lw	$t2, BOT_Y
+	sub     $t5, $t3, $t1
+	mul	$t5, $t5, $t5	# x^2
+	sub     $t6, $t4, $t2
+	mul	$t6, $t6, $t6	# y^2
+	add	$v0, $t6, $t5	# x^2 + y^2
+	bge 	$v0, 150, _restart
+	j 	done_waiting
+
+_restart:
+	j 	restart
 
 .globl find_words
 find_words:
@@ -297,13 +517,13 @@ fw_k:
 	move	$a2, $s6		# end
 #	sw 	$a2, PRINT_INT
 	# bge 	$t3, 4, fast
-	jal		horiz_strncmp
-	# j 		record_next
+	jal	horiz_strncmp
+	# j 	record_next
 # fast:
-	# la 		$a0, 0($a0)
+	# la 	$a0, 0($a0)
 	# jal   horiz_strncmp_fast
 record_next:
-	sub		$t0, $v0, 1
+	sub	$t0, $v0, 1
 	bgezal	$t0, fw_record
 fw_vert:
 	move	$a0, $s8		# word
@@ -425,7 +645,10 @@ record_word:
 	add 	$t5, $t5 ,1
 	la 	$t3, solution
 	sw 	$t5, 0($t3)
+	bge 	$t5, 4, too_many
 	jr	$ra
+too_many:
+	j 	solver
 .globl get_character
 get_character:
 	lw	$t0, num_columns
