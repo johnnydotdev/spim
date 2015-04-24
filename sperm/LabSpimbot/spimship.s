@@ -53,6 +53,8 @@ BONK_ACK  = 0xffff0060
 TIMER 	 = 0xffff001c
 TIMER_MASK = 0x8000
 TIMER_ACK = 0xffff006c
+# Constant values
+CHASE_ITERATIONS = 2048
 .text
 main:
 	# your code goes here
@@ -132,9 +134,12 @@ infinite:					# used to calculate coordinate of dust
 loop_move:
 	lw	$t3, BOT_X		#get the BOT's x coordinate
 	lw	$t4, BOT_Y 		#get the BOT's y coordinate
-	sub     $t5, $t3, $t1
+	la 	$t6, extra_space
+	lw 	$t1, 20($t6)
+	lw 	$t2, 24($t6)		# load some shit regarding dust particles
+	sub     $t5, $t3, $t1		# x - dust_x
 	mul	$t5, $t5, $t5		# x^2
-	sub     $t6, $t4, $t2
+	sub     $t6, $t4, $t2		# y - dust_y
 	mul	$t6, $t6, $t6		# y^2
 	add	$v0, $t6, $t5		# x^2 + y^2
 	mtc1	$v0, $f0
@@ -187,9 +192,38 @@ movedown:
 	sw	$t6, ANGLE_CONTROL
 	j 	loop_move
 done_moving:
-	li	$t0, 0
+	li      $t5, 4
+	sw      $t5, FIELD_STRENGTH	
+	li	$t0, 1
 	sw	$t0, VELOCITY		# drive
-	li      $t5, 3
+	li 	$t5, 3
+	sw 	$t5, FIELD_STRENGTH
+	li 	$t0, 3
+	sw 	$t0, VELOCITY
+
+planet_loop:
+	li 	$a0, 0
+	jal 	align_planet
+	li 	$a0, 1
+	jal 	align_planet
+
+	la 	$t0, planet_data
+	sw 	$t0, PLANETS_REQUEST
+
+	# if not aligne3d in x
+	lw 	$t1, 0($t0)
+	lw 	$t2, BOT_X
+	bne 	$t1, $t2, planet_loop
+
+	# if not aligned in y
+	lw 	$t1, 4($t0)
+	lw 	$t2, BOT_Y
+	bne 	$t1, $t2, planet_loop
+
+	add 	$s0, $s0, 1
+	blt	$s0, CHASE_ITERATIONS, planet_loop
+
+	li      $t5, 0
 	sw      $t5, FIELD_STRENGTH	
 energy_check:
 	la 	$t1, energy_flag
@@ -242,6 +276,28 @@ done_loop:
 no_energy_interrupt:
 	
 	j 	restart
+
+align_planet:
+	mul	$t0, $a0, 90		# base angle (0 for X, 90 for Y)
+	mul	$a0, $a0, 4		# addressing int arrays
+
+ap_loop:
+	la	$t1, planet_data
+	sw	$t1, PLANETS_REQUEST	# get updated coordinates
+	lw	$t1, planet_data($a0)	# planet coordinate
+	lw	$t2, BOT_X($a0)		# bot coordinate
+	beq	$t1, $t2, ap_done
+
+	slt	$t1, $t1, $t2		# planet above or to the left
+	mul	$t1, $t1, 180		# flip bot if needed
+	add	$t1, $t0, $t1
+	sw	$t1, ANGLE
+	li	$t1, 1
+	sw	$t1, ANGLE_CONTROL
+	j	ap_loop
+
+ap_done:
+	jr	$ra
 
 
 .globl find_words
