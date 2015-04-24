@@ -53,6 +53,10 @@ BONK_ACK  = 0xffff0060
 TIMER 	 = 0xffff001c
 TIMER_MASK = 0x8000
 TIMER_ACK = 0xffff006c
+<<<<<<< HEAD
+=======
+# Constant values
+>>>>>>> origin/master
 CHASE_ITERATIONS = 2048
 .text
 main:
@@ -139,9 +143,12 @@ infinite:					# used to calculate coordinate of dust
 loop_move:
 	lw	$t3, BOT_X		#get the BOT's x coordinate
 	lw	$t4, BOT_Y 		#get the BOT's y coordinate
-	sub     $t5, $t3, $t1
+	la 	$t6, extra_space
+	lw 	$t1, 20($t6)
+	lw 	$t2, 24($t6)		# load some shit regarding dust particles
+	sub     $t5, $t3, $t1		# x - dust_x
 	mul	$t5, $t5, $t5		# x^2
-	sub     $t6, $t4, $t2
+	sub     $t6, $t4, $t2		# y - dust_y
 	mul	$t6, $t6, $t6		# y^2
 	add	$v0, $t6, $t5		# x^2 + y^2
 	mtc1	$v0, $f0
@@ -193,6 +200,7 @@ movedown:
 	li      $t6, 1			#set to absolute
 	sw	$t6, ANGLE_CONTROL
 	j 	loop_move
+<<<<<<< HEAD
 done_moving:	# drive
 	li      $t5, 5
 	sw      $t5, FIELD_STRENGTH	
@@ -225,6 +233,183 @@ planet_loop:
 energy_check:
  
 la	$t0, planet_data
+=======
+done_moving:
+	li      $t5, 4
+	sw      $t5, FIELD_STRENGTH	
+	li	$t0, 1
+	sw	$t0, VELOCITY		# drive
+	li 	$t5, 3
+	sw 	$t5, FIELD_STRENGTH
+	li 	$t0, 3
+	sw 	$t0, VELOCITY
+
+planet_loop:
+	li 	$a0, 0
+	jal 	align_planet
+	li 	$a0, 1
+	jal 	align_planet
+
+	la 	$t0, planet_data
+	sw 	$t0, PLANETS_REQUEST
+
+	# if not aligne3d in x
+	lw 	$t1, 0($t0)
+	lw 	$t2, BOT_X
+	bne 	$t1, $t2, planet_loop
+
+	# if not aligned in y
+	lw 	$t1, 4($t0)
+	lw 	$t2, BOT_Y
+	bne 	$t1, $t2, planet_loop
+
+	add 	$s0, $s0, 1
+	blt	$s0, CHASE_ITERATIONS, planet_loop
+
+	li      $t5, 0
+	sw      $t5, FIELD_STRENGTH	
+
+# energy_check:
+ 
+# la	$t0, planet_data
+# 	sw	$t0, PLANETS_REQUEST
+# 	la 	$t0, planet_data	#load address of planet_request into $t0
+# 	lw	$t3, 0($t0)		#loads the planet X coord
+# 	lw	$t4, 4($t0)		#loads the planet Y coord
+# 	lw	$t1, BOT_X
+# 	lw	$t2, BOT_Y
+# 	sub     $t5, $t3, $t1
+# 	mul	$t5, $t5, $t5	# x^2
+# 	sub     $t6, $t4, $t2
+# 	mul	$t6, $t6, $t6	# y^2
+# 	add	$v0, $t6, $t5	# x^2 + y^2
+# 	mtc1	$v0, $f0
+# 	cvt.s.w	$f0, $f0		# float(x^2 + y^2)
+# 	sqrt.s	$f0, $f0		# sqrt(x^2 + y^2)
+# 	cvt.w.s	$f0, $f0		# int(sqrt(...))
+# 	mfc1	$v0, $f0	
+# 	move 	$t0, $v0
+# 	la 	$t1, puzzle
+# 	sw	$t1, SPIMBOT_PUZZLE_REQUEST
+# 	la 	$t1, puzzle
+# 	lw 	$t2, 0($t1)		#contains num_rows
+# 	la 	$t5, num_rows
+# 	sw 	$t2, 0($t5)		#store num_rows
+# 	lw	$t2, 4($t1)		#contains num_columns
+# 	la 	$t5, num_columns
+# 	sw 	$t2, 0($t5)		#store num_columns
+
+# 	la 	$t1, lexicon
+# 	sw 	$t1, SPIMBOT_LEXICON_REQUEST
+# 	lw 	$a1, 0($t1)		#load word into a1 the lexicon_size
+# 	add 	$t1, $t1, 4
+# 	move	$a0, $t1		#load the char ** dictionary)
+# 	jal 	find_words
+# #	lw 	$t1, GET_ENERGY
+# #	sw 	$t1, PRINT_INT
+# solver:
+# 	la 	$t1, solution
+# 	sw 	$t1, SPIMBOT_SOLVE_REQUEST
+# #	lw 	$t1, GET_ENERGY
+#  #	sw 	$t1, PRINT_INT
+# #	lw 	$t1, solution_count
+# #	sw 	$t1, PRINT_INT
+# 	move 	$t2, $zero
+# # print_loop:
+# # 	bge	$t2, $t1, done_loop
+# # 	li	$v0, PRINT_STRING			# Unhandled interrupt types
+# # 	la	$a0, test_str
+# # 	la 	$t3, solution_arr
+# # 	mul	$t4, $t2, 8
+# # 	add 	$t4, $t4, $t3
+# # 	lw 	$t1, 0($t4)
+# # 	sw 	$t1, PRINT_INT
+# # 	lw 	$t1, 4($t4)
+# # 	sw 	$t1, PRINT_INT
+# # 	add 	$t2, $t2, 1
+# # 	j 	print_loop
+# done_loop:
+# 	la 	$t1, solution 		#reste solution here
+# 	sw 	$zero, 0($t1) 
+
+
+# no_energy_interrupt:
+	
+# 	done_can_field_strength:
+# 	li 	$t0, 2
+# 	sw 	$t0, FIELD_STRENGTH
+#I'm going to implememtn a check to see if I'm too close to the planenet to start with, then I'll wait it to come back the next time
+
+move_towards_orbital:
+	
+	la	$t0, planet_data	#load the address of planet data
+	sw	$t0, PLANETS_REQUEST	#store the address of the stack memory in to planet_request
+	lw	$t7, 8($t0)		#loads the planet's orbital radius
+	#lw	$t3, 0($t0)		#holds x coordinate of the my planet
+	#lw	$t4, 4($t0)		#hollds y coordinate of my planet
+	li	$t3, 150 		#load x and y coord with that of the sun (center)
+	li 	$t4, 150
+	lw	$t1, BOT_X
+	lw	$t2, BOT_Y
+	sub     $t5, $t3, $t1
+	mul	$t5, $t5, $t5	# x^2
+	sub     $t6, $t4, $t2
+	mul	$t6, $t6, $t6	# y^2
+	add	$v0, $t6, $t5	# x^2 + y^2
+	mtc1	$v0, $f0
+	cvt.s.w	$f0, $f0	# float(x^2 + y^2)
+	sqrt.s	$f0, $f0	# sqrt(x^2 + y^2)
+	cvt.w.s	$f0, $f0	# int(sqrt(...))
+	mfc1	$v0, $f0	
+	move 	$t0, $v0
+#t0 now contains the eucledian distance
+#if the distance != orbital radius, I am going to move towards the orbital radius point. 
+	
+	ble 	$t0, $t7, stop_moving_wait
+#now to check if the distance is greater than or less than the orbital radius
+	li 	$t5, 4
+	sw 	$t5, VELOCITY
+	#blt 	$t0, $t7, less_than	#the bot is less than the orbital radius away 
+	bgt 	$t0, $t7, greater_than 	#the bot is further than the orbiatl radius away 
+	j 	move_towards_orbital	#just in case.. Should never hit this statement. Logical Check.
+greater_than:
+	bgt 	$t1, $t3, right_1	#check if bot_x > 150
+	bgt 	$t2, $t4, left_down_1
+	li	$t5, 45			#set angle to 0
+	sw	$t5, ANGLE		
+	li      $t6, 1			#set to absolute
+	sw	$t6, ANGLE_CONTROL
+	j 	move_towards_orbital
+left_down_1:
+	li	$t5, 315		#set angle to 0
+	sw	$t5, ANGLE		
+	li      $t6, 1			#set to absolute
+	sw	$t6, ANGLE_CONTROL
+	j 	move_towards_orbital
+right_1:	
+	bgt 	$t2, $t4, right_down_1
+	li	$t5, 135		#set angle to 0
+	sw	$t5, ANGLE		
+	li      $t6, 1			#set to absolute
+	sw	$t6, ANGLE_CONTROL
+	j 	move_towards_orbital
+right_down_1:
+	li	$t5, 225		#set angle to 0
+	sw	$t5, ANGLE		
+	li      $t6, 1			#set to absolute
+	sw	$t6, ANGLE_CONTROL
+	j 	move_towards_orbital
+
+stop_moving_wait:
+#wait till the red planet is on me.
+
+	li 	$t0, 2
+	sw 	$t0, FIELD_STRENGTH
+	sw 	$zero, VELOCITY #stop the bot and wait for the red planet
+energy_check:
+ 
+	la	$t0, planet_data
+>>>>>>> origin/master
 	sw	$t0, PLANETS_REQUEST
 	la 	$t0, planet_data	#load address of planet_request into $t0
 	lw	$t3, 0($t0)		#loads the planet X coord
@@ -242,6 +427,11 @@ la	$t0, planet_data
 	cvt.w.s	$f0, $f0		# int(sqrt(...))
 	mfc1	$v0, $f0	
 	move 	$t0, $v0
+<<<<<<< HEAD
+=======
+	blt	$t0, 90, no_energy_interrupt
+
+>>>>>>> origin/master
 	la 	$t1, puzzle
 	sw	$t1, SPIMBOT_PUZZLE_REQUEST
 	la 	$t1, puzzle
@@ -267,7 +457,7 @@ solver:
  #	sw 	$t1, PRINT_INT
 #	lw 	$t1, solution_count
 #	sw 	$t1, PRINT_INT
-	move 	$t2, $zero
+#	move 	$t2, $zero
 # print_loop:
 # 	bge	$t2, $t1, done_loop
 # 	li	$v0, PRINT_STRING			# Unhandled interrupt types
@@ -286,6 +476,7 @@ done_loop:
 	sw 	$zero, 0($t1) 
 
 
+<<<<<<< HEAD
 # no_energy_interrupt:
 	
 # 	done_can_field_strength:
@@ -425,6 +616,14 @@ done_loop:
 
 _restart:
 	j 	restart
+=======
+no_energy_interrupt:
+	
+	done_can_field_strength:
+	li 	$t0, 2
+	sw 	$t0, FIELD_STRENGTH
+
+>>>>>>> origin/master
 align_planet:
 	mul	$t0, $a0, 90		# base angle (0 for X, 90 for Y)
 	mul	$a0, $a0, 4		# addressing int arrays
@@ -446,6 +645,66 @@ ap_loop:
 
 ap_done:
 	jr	$ra
+<<<<<<< HEAD
+=======
+
+
+	# li 	$t0, 2
+	# sw 	$t0, FIELD_STRENGTH
+	# sw 	$zero, VELOCITY #stop the bot and wait for the red planet
+	la	$t0, planet_data
+	sw	$t0, PLANETS_REQUEST
+	la 	$t0, planet_data	#load address of planet_request into $t0
+	lw	$t3, 0($t0)		#loads the planet X coord
+	lw	$t4, 4($t0)		#loads the planet Y coord
+	lw 	$t7, 12($t0) 		#hill sphere radius. If the diff is the hill sphere radius, then I will relase.
+check_if_planet_bot_align:
+	la	$t0, planet_data
+	sw	$t0, PLANETS_REQUEST
+	la 	$t0, planet_data	#load address of planet_request into $t0
+	lw	$t3, 0($t0)		#loads the planet X coord
+	lw	$t4, 4($t0)		#loads the planet Y coord
+	lw	$t1, BOT_X
+	lw	$t2, BOT_Y
+	sub     $t5, $t3, $t1
+	mul	$t5, $t5, $t5	# x^2
+	sub     $t6, $t4, $t2
+	mul	$t6, $t6, $t6	# y^2
+	add	$v0, $t6, $t5	# x^2 + y^2
+
+	ble 	$v0, $t7, planet_reached
+	j 	check_if_planet_bot_align
+
+planet_reached:
+	
+
+# loop_start:
+# 	la 	$t2, field_count
+# 	sw 	$t2, SPIMBOT_GET_FIELD_CNT
+# 	lw 	$t2, 0($t2)
+# 	beq	$t2, $zero, done_waiting
+# 	j 	loop_start
+done_waiting:
+	li 	$t0, 0
+	sw 	$t0, FIELD_STRENGTH	#release them
+	la	$t0, planet_data
+	sw	$t0, PLANETS_REQUEST
+	la 	$t0, planet_data	#load address of planet_request into $t0
+	lw	$t3, 0($t0)		#loads the planet X coord
+	lw	$t4, 4($t0)		#loads the planet Y coord
+	lw	$t1, BOT_X
+	lw	$t2, BOT_Y
+	sub     $t5, $t3, $t1
+	mul	$t5, $t5, $t5	# x^2
+	sub     $t6, $t4, $t2
+	mul	$t6, $t6, $t6	# y^2
+	add	$v0, $t6, $t5	# x^2 + y^2
+	bge 	$v0, 150, _restart
+	j 	done_waiting
+
+_restart:
+	j 	restart
+>>>>>>> origin/master
 
 .globl find_words
 find_words:
