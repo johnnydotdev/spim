@@ -9,7 +9,7 @@ num_rows: 	.space 4
 num_columns: 	.space 4
 solution: 	.space 804
 energy_flag:	.space 4
-filed_count:	.space 4
+field_count:	.space 4
 test_str:	.asciiz "PRINT solution\n"
 horiz_strncmp_str: .asciiz "In horiz_strncmp\n"
 #puzzle: 	.space 4
@@ -53,6 +53,7 @@ BONK_ACK  = 0xffff0060
 TIMER 	 = 0xffff001c
 TIMER_MASK = 0x8000
 TIMER_ACK = 0xffff006c
+CHASE_ITERATIONS = 2048
 .text
 main:
 	# your code goes here
@@ -78,6 +79,12 @@ main:
 restart:
 	# lw 	$t1, GET_ENERGY
  # 	sw 	$t1, PRINT_INT
+ 	# lw 	$t1, GET_ENERGY
+ 	# bge 	$t1, 40, done_loop
+
+
+
+
 	li	$t2, 0    			# counter
 	la	$t1, scan_data			# load scan data
 	li      $t5, 0 				# load 0 for flag for scanning
@@ -143,7 +150,7 @@ loop_move:
 	cvt.w.s	$f0, $f0		# int(sqrt(...))
 	mfc1	$v0, $f0	
 	move 	$t0, $v0
-	bne 	$t0, 0, x_loop	 		
+	bge 	$t0, 5, x_loop	 		
 	j 	done_moving
 #t3 holds bot_x and t4 holds bot_y. t1 holds dust x and t2 hold dust y
 #if(dust_x< bot_x)
@@ -186,15 +193,55 @@ movedown:
 	li      $t6, 1			#set to absolute
 	sw	$t6, ANGLE_CONTROL
 	j 	loop_move
-done_moving:
-	li	$t0, 0
-	sw	$t0, VELOCITY		# drive
-	li      $t5, 3
+done_moving:	# drive
+	li      $t5, 5
 	sw      $t5, FIELD_STRENGTH	
+	li		$t6, 5
+	sw		$t6, VELOCITY	
+planet_loop:
+	li 	$a0, 0
+	jal 	align_planet
+	li 	$a0, 1
+	jal 	align_planet
+
+	la 	$t0, planet_data
+	sw 	$t0, PLANETS_REQUEST
+
+	# if not aligne3d in x
+	lw 	$t1, 0($t0)
+	lw 	$t2, BOT_X
+	bne 	$t1, $t2, planet_loop
+
+	# if not aligned in y
+	lw 	$t1, 4($t0)
+	lw 	$t2, BOT_Y
+	bne 	$t1, $t2, planet_loop
+
+	add 	$s0, $s0, 1
+	blt	$s0, CHASE_ITERATIONS, planet_loop
+
+	li      $t5, 0
+	sw      $t5, FIELD_STRENGTH		
 energy_check:
-	la 	$t1, energy_flag
-	lw 	$t1, 0($t1)
-	beq	$t1, $zero, no_energy_interrupt
+ 
+la	$t0, planet_data
+	sw	$t0, PLANETS_REQUEST
+	la 	$t0, planet_data	#load address of planet_request into $t0
+	lw	$t3, 0($t0)		#loads the planet X coord
+	lw	$t4, 4($t0)		#loads the planet Y coord
+	lw	$t1, BOT_X
+	lw	$t2, BOT_Y
+	sub     $t5, $t3, $t1
+	mul	$t5, $t5, $t5	# x^2
+	sub     $t6, $t4, $t2
+	mul	$t6, $t6, $t6	# y^2
+	add	$v0, $t6, $t5	# x^2 + y^2
+	mtc1	$v0, $f0
+	cvt.s.w	$f0, $f0		# float(x^2 + y^2)
+	sqrt.s	$f0, $f0		# sqrt(x^2 + y^2)
+	cvt.w.s	$f0, $f0		# int(sqrt(...))
+	mfc1	$v0, $f0	
+	move 	$t0, $v0
 	la 	$t1, puzzle
 	sw	$t1, SPIMBOT_PUZZLE_REQUEST
 	la 	$t1, puzzle
@@ -213,6 +260,7 @@ energy_check:
 	jal 	find_words
 #	lw 	$t1, GET_ENERGY
 #	sw 	$t1, PRINT_INT
+solver:
 	la 	$t1, solution
 	sw 	$t1, SPIMBOT_SOLVE_REQUEST
 #	lw 	$t1, GET_ENERGY
@@ -234,15 +282,170 @@ energy_check:
 # 	add 	$t2, $t2, 1
 # 	j 	print_loop
 done_loop:
-	la 	$t1, solution
-	sw 	$zero, 0($t1)
-	la 	$t1, energy_flag
-	sw	$zero, 0($t1)
-	# SET ENERGY COUNT TO BE 0
-no_energy_interrupt:
-	
-	j 	restart
+	la 	$t1, solution 		#reste solution here
+	sw 	$zero, 0($t1) 
 
+
+# no_energy_interrupt:
+	
+# 	done_can_field_strength:
+# 	li 	$t0, 2
+# 	sw 	$t0, FIELD_STRENGTH
+#I'm going to implememtn a check to see if I'm too close to the planenet to start with, then I'll wait it to come back the next time
+#wait till the red planet is on me.
+
+# 	li 	$t0, 2
+# 	sw 	$t0, FIELD_STRENGTH
+# 	sw 	$zero, VELOCITY #stop the bot and wait for the red planet
+# energy_check:
+ 
+# 	la	$t0, planet_data
+# 	sw	$t0, PLANETS_REQUEST
+# 	la 	$t0, planet_data	#load address of planet_request into $t0
+# 	lw	$t3, 0($t0)		#loads the planet X coord
+# 	lw	$t4, 4($t0)		#loads the planet Y coord
+# 	lw	$t1, BOT_X
+# 	lw	$t2, BOT_Y
+# 	sub     $t5, $t3, $t1
+# 	mul	$t5, $t5, $t5	# x^2
+# 	sub     $t6, $t4, $t2
+# 	mul	$t6, $t6, $t6	# y^2
+# 	add	$v0, $t6, $t5	# x^2 + y^2
+# 	mtc1	$v0, $f0
+# 	cvt.s.w	$f0, $f0		# float(x^2 + y^2)
+# 	sqrt.s	$f0, $f0		# sqrt(x^2 + y^2)
+# 	cvt.w.s	$f0, $f0		# int(sqrt(...))
+# 	mfc1	$v0, $f0	
+# 	move 	$t0, $v0
+# 	blt	$t0, 90, no_energy_interrupt
+
+# 	la 	$t1, puzzle
+# 	sw	$t1, SPIMBOT_PUZZLE_REQUEST
+# 	la 	$t1, puzzle
+# 	lw 	$t2, 0($t1)		#contains num_rows
+# 	la 	$t5, num_rows
+# 	sw 	$t2, 0($t5)		#store num_rows
+# 	lw	$t2, 4($t1)		#contains num_columns
+# 	la 	$t5, num_columns
+# 	sw 	$t2, 0($t5)		#store num_columns
+
+# 	la 	$t1, lexicon
+# 	sw 	$t1, SPIMBOT_LEXICON_REQUEST
+# 	lw 	$a1, 0($t1)		#load word into a1 the lexicon_size
+# 	add 	$t1, $t1, 4
+# 	move	$a0, $t1		#load the char ** dictionary)
+# 	jal 	find_words
+# #	lw 	$t1, GET_ENERGY
+# #	sw 	$t1, PRINT_INT
+# solver:
+# 	la 	$t1, solution
+# 	sw 	$t1, SPIMBOT_SOLVE_REQUEST
+# #	lw 	$t1, GET_ENERGY
+#  #	sw 	$t1, PRINT_INT
+# #	lw 	$t1, solution_count
+# #	sw 	$t1, PRINT_INT
+# #	move 	$t2, $zero
+# # print_loop:
+# # 	bge	$t2, $t1, done_loop
+# # 	li	$v0, PRINT_STRING			# Unhandled interrupt types
+# # 	la	$a0, test_str
+# # 	la 	$t3, solution_arr
+# # 	mul	$t4, $t2, 8
+# # 	add 	$t4, $t4, $t3
+# # 	lw 	$t1, 0($t4)
+# # 	sw 	$t1, PRINT_INT
+# # 	lw 	$t1, 4($t4)
+# # 	sw 	$t1, PRINT_INT
+# # 	add 	$t2, $t2, 1
+# # 	j 	print_loop
+# done_loop:
+# 	la 	$t1, solution 		#reste solution here
+# 	sw 	$zero, 0($t1) 
+
+
+# no_energy_interrupt:
+	
+# 	done_can_field_strength:
+# 	li 	$t0, 2
+# 	sw 	$t0, FIELD_STRENGTH
+
+
+	# li 	$t0, 2
+	# sw 	$t0, FIELD_STRENGTH
+	# sw 	$zero, VELOCITY #stop the bot and wait for the red planet
+# 	la	$t0, planet_data
+# 	sw	$t0, PLANETS_REQUEST
+# 	la 	$t0, planet_data	#load address of planet_request into $t0
+# 	lw	$t3, 0($t0)		#loads the planet X coord
+# 	lw	$t4, 4($t0)		#loads the planet Y coord
+# 	lw 	$t7, 12($t0) 		#hill sphere radius. If the diff is the hill sphere radius, then I will relase.
+# check_if_planet_bot_align:
+# 	la	$t0, planet_data
+# 	sw	$t0, PLANETS_REQUEST
+# 	la 	$t0, planet_data	#load address of planet_request into $t0
+# 	lw	$t3, 0($t0)		#loads the planet X coord
+# 	lw	$t4, 4($t0)		#loads the planet Y coord
+# 	lw	$t1, BOT_X
+# 	lw	$t2, BOT_Y
+# 	sub     $t5, $t3, $t1
+# 	mul	$t5, $t5, $t5	# x^2
+# 	sub     $t6, $t4, $t2
+# 	mul	$t6, $t6, $t6	# y^2
+# 	add	$v0, $t6, $t5	# x^2 + y^2
+
+# 	ble 	$v0, $t7, planet_reached
+# 	j 	check_if_planet_bot_align
+
+# planet_reached:
+	
+
+# loop_start:
+# 	la 	$t2, field_count
+# 	sw 	$t2, SPIMBOT_GET_FIELD_CNT
+# 	lw 	$t2, 0($t2)
+# 	beq	$t2, $zero, done_waiting
+# 	j 	loop_start
+# done_waiting:
+# 	li 	$t0, 0
+# 	sw 	$t0, FIELD_STRENGTH	#release them
+# 	la	$t0, planet_data
+# 	sw	$t0, PLANETS_REQUEST
+# 	la 	$t0, planet_data	#load address of planet_request into $t0
+# 	lw	$t3, 0($t0)		#loads the planet X coord
+# 	lw	$t4, 4($t0)		#loads the planet Y coord
+# 	lw	$t1, BOT_X
+# 	lw	$t2, BOT_Y
+# 	sub     $t5, $t3, $t1
+# 	mul	$t5, $t5, $t5	# x^2
+# 	sub     $t6, $t4, $t2
+# 	mul	$t6, $t6, $t6	# y^2
+# 	add	$v0, $t6, $t5	# x^2 + y^2
+# 	bge 	$v0, 150, _restart
+# 	j 	done_waiting
+
+_restart:
+	j 	restart
+align_planet:
+	mul	$t0, $a0, 90		# base angle (0 for X, 90 for Y)
+	mul	$a0, $a0, 4		# addressing int arrays
+
+ap_loop:
+	la	$t1, planet_data
+	sw	$t1, PLANETS_REQUEST	# get updated coordinates
+	lw	$t1, planet_data($a0)	# planet coordinate
+	lw	$t2, BOT_X($a0)		# bot coordinate
+	beq	$t1, $t2, ap_done
+
+	slt	$t1, $t1, $t2		# planet above or to the left
+	mul	$t1, $t1, 180		# flip bot if needed
+	add	$t1, $t0, $t1
+	sw	$t1, ANGLE
+	li	$t1, 1
+	sw	$t1, ANGLE_CONTROL
+	j	ap_loop
+
+ap_done:
+	jr	$ra
 
 .globl find_words
 find_words:
@@ -297,13 +500,13 @@ fw_k:
 	move	$a2, $s6		# end
 #	sw 	$a2, PRINT_INT
 	# bge 	$t3, 4, fast
-	jal		horiz_strncmp
-	# j 		record_next
+	jal	horiz_strncmp
+	# j 	record_next
 # fast:
-	# la 		$a0, 0($a0)
+	# la 	$a0, 0($a0)
 	# jal   horiz_strncmp_fast
 record_next:
-	sub		$t0, $v0, 1
+	sub	$t0, $v0, 1
 	bgezal	$t0, fw_record
 fw_vert:
 	move	$a0, $s8		# word
@@ -425,7 +628,10 @@ record_word:
 	add 	$t5, $t5 ,1
 	la 	$t3, solution
 	sw 	$t5, 0($t3)
+	bge 	$t5, 4, too_many
 	jr	$ra
+too_many:
+	j 	solver
 .globl get_character
 get_character:
 	lw	$t0, num_columns
@@ -583,26 +789,27 @@ scan_interrupt:
 	j 	interrupt_dispatch
 energy_interrupt:
 	sw      $a1, ENERGY_ACKNOWLEDGE	
-	la 	$t1, energy_flag
-	li 	$t2, 1
-	sw 	$t2, 0($t1)
-	# la 	$t1, puzzle
-	# sw	$t1, SPIMBOT_PUZZLE_REQUEST
-#	la 	$t2, puzzle
-#	sw 	$t2, 8($t1)
-	# la 	$t1, puzzle
-	# lw 	$t2, 0($t1)		#contains num_rows
-	# la 	$t5, num_rows
-	# sw 	$t2, 0($t5)		#store num_rows
-	# lw	$t2, 4($t1)		#contains num_columns
-	# la 	$t5, num_columns
-	# sw 	$t2, 0($t5)		#store num_columns
-	# la 	$t1, lexicon
-	# sw 	$t1, SPIMBOT_LEXICON_REQUEST
-	# lw 	$a1, 0($t1)		#load word into a1 the lexicon_size
-	# add 	$t1, $t1, 4
-	# move	$a0, $t1		#load the char ** dictionary)
-	# jal 	find_words
+	# la 	$t1, energy_flag
+	# li 	$t2, 1
+	# sw 	$t2, 0($t1)
+	la 	$t1, puzzle
+	sw	$t1, SPIMBOT_PUZZLE_REQUEST
+	la 	$t2, puzzle
+	sw 	$t2, 8($t1)
+	la 	$t1, puzzle
+	lw 	$t2, 0($t1)		#contains num_rows
+	la 	$t5, num_rows
+	sw 	$t2, 0($t5)		#store num_rows
+	lw	$t2, 4($t1)		#contains num_columns
+	la 	$t5, num_columns
+	sw 	$t2, 0($t5)		#store num_columns
+	la 	$t1, lexicon
+	sw 	$t1, SPIMBOT_LEXICON_REQUEST
+	lw 	$a1, 0($t1)		#load word into a1 the lexicon_size
+	add 	$t1, $t1, 4
+	move	$a0, $t1		#load the char ** dictionary)
+	la 	$t5, find_words
+	jalr $t5
 	# lw 	$t1, GET_ENERGY
  # 	sw 	$t1, PRINT_INT
 	# la 	$t1, solution_count
@@ -611,11 +818,11 @@ energy_interrupt:
 
 	# sw 	$zero, PRINT_INT
 	# sw 	$zero, PRINT_INT
-
-	# sw 	$t1, SPIMBOT_SOLVE_REQUEST
+	#la 	$t1, solution_count
 	# lw 	$t1, GET_ENERGY
  # 	sw 	$t1, PRINT_INT
-	# la 	$t1, solution_count
+
+
 	j       interrupt_dispatch		
 timer_interrupt:
 	sw	$a1, TIMER_ACK				# acknowledge interrupt
